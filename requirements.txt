@@ -1,0 +1,4 @@
+Flask
+requests
+vercel-kv
+python-dotenv  # Add this line
