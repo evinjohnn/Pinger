@@ -20,5 +20,4 @@
       "dest": "public/$1"
     }
   ]
-  // The "crons" section has been completely removed.
 }

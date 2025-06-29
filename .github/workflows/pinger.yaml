@@ -1,0 +1,25 @@
+# .github/workflows/pinger.yml
+name: Website Pinger
+
+on:
+  schedule:
+    # This is a cron expression that means "run at every 5th minute"
+    - cron: '*/5 * * * *'
+  
+  # This line allows you to run the workflow manually from the Actions tab on GitHub
+  # which is great for testing!
+  workflow_dispatch:
+
+jobs:
+  ping:
+    # Use a standard, free virtual machine provided by GitHub
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Ping the live endpoint
+        # This is the command that will be run.
+        # It uses the 'curl' tool to send a GET request.
+        # -H adds the Authorization header with your secret token.
+        # The secrets are securely injected by GitHub.
+        run: |
+          curl -X GET -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" "${{ secrets.PING_URL }}"
