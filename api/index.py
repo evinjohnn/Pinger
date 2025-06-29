@@ -1,13 +1,10 @@
-# api/index.py (Correct and Final Version)
+
 import os
 import time
 import requests
 from flask import Flask, request, jsonify, send_from_directory
 
-# --- START: Mocking & Real KV Logic ---
-# This code checks if the Vercel-specific environment variables for the KV store exist.
-# If they DON'T exist, we know we're running locally and create a fake "mock" database.
-# If they DO exist, we know we're on Vercel and use the real database.
+
 
 vercel_kv_url = os.environ.get('VERCEL_KV_URL')
 vercel_kv_rest_api_url = os.environ.get('VERCEL_KV_REST_API_URL')
@@ -18,7 +15,7 @@ if not all([vercel_kv_url, vercel_kv_rest_api_url, vercel_kv_rest_api_token]):
     print("--- Vercel KV env vars not found. Using in-memory MockKV. ---")
     print("--- Data will be lost on server restart. ---")
     
-    # This is our fake, in-memory database class
+    
     class MockKV:
         def __init__(self):
             # We'll just use a simple Python set to store URLs
