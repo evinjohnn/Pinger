@@ -2,9 +2,12 @@ import os
 import time
 import requests
 from flask import Flask, request, jsonify
-from vercel_kv import kv
+from vercel_kv import KV
 
 app = Flask(__name__)
+
+# Initialize KV store
+kv = KV()
 
 # A simple health check route
 @app.route('/')
