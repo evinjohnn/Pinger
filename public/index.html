@@ -3,47 +3,741 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Website Pinger Service</title>
+    <title>Pinger - Keep Your Sites Alive</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📡</text></svg>">
+    <link href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@100;200;300;400;500;600;700;800;900&family=SF+Pro+Text:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; background-color: #f4f4f9; color: #333; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .container { background: #fff; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); text-align: center; }
-        h1 { color: #1a1a1a; }
-        input[type="url"] { width: 80%; padding: 10px; margin-bottom: 1rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem; }
-        button { background-color: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; font-size: 1rem; cursor: pointer; transition: background-color 0.3s; }
-        button:hover { background-color: #0056b3; }
-        #message { margin-top: 1rem; font-weight: bold; }
-        .success { color: #28a745; }
-        .error { color: #dc3545; }
+        :root {
+            --primary-light: #F2F2F2;
+            --primary-medium: #EAE4D5;
+            --primary-dark: #B6B09F;
+            --primary-black: #000000;
+            
+            --glass-bg: rgba(242, 242, 242, 0.15);
+            --glass-border: rgba(182, 176, 159, 0.3);
+            --glass-shadow: rgba(0, 0, 0, 0.1);
+            --glass-hover: rgba(234, 228, 213, 0.2);
+            
+            --text-primary: var(--primary-black);
+            --text-secondary: rgba(0, 0, 0, 0.7);
+            --text-tertiary: rgba(0, 0, 0, 0.5);
+            
+            --accent-gradient: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary-black) 100%);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html, body {
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif;
+            background: linear-gradient(135deg, 
+                var(--primary-light) 0%, 
+                var(--primary-medium) 50%, 
+                var(--primary-dark) 100%);
+            color: var(--text-primary);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            padding: 1rem;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(circle at 20% 20%, rgba(182, 176, 159, 0.1) 0%, transparent 40%),
+                radial-gradient(circle at 80% 80%, rgba(234, 228, 213, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 50% 50%, rgba(242, 242, 242, 0.1) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+            animation: floatingOrbs 20s ease-in-out infinite;
+        }
+
+        @keyframes floatingOrbs {
+            0%, 100% { transform: translateY(0px) rotate(0deg); opacity: 0.7; }
+            50% { transform: translateY(-10px) rotate(180deg); opacity: 1; }
+        }
+
+        .app-container {
+            position: relative;
+            z-index: 1;
+            animation: containerFloat 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            opacity: 0;
+            transform: translateY(30px) scale(0.95);
+            width: 100%;
+            max-width: 420px;
+        }
+
+        @keyframes containerFloat {
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .liquid-glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(40px) saturate(150%) brightness(105%);
+            -webkit-backdrop-filter: blur(40px) saturate(150%) brightness(105%);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 1.8rem;
+            width: 100%;
+            box-shadow: 
+                0 20px 40px rgba(0, 0, 0, 0.1),
+                0 10px 20px rgba(0, 0, 0, 0.05),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2),
+                inset 0 -1px 0 rgba(0, 0, 0, 0.05);
+            position: relative;
+            transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+            overflow: hidden;
+        }
+
+        .liquid-glass-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, 
+                transparent 0%, 
+                rgba(255, 255, 255, 0.4) 50%, 
+                transparent 100%);
+            animation: shimmer 3s ease-in-out infinite;
+        }
+
+        @keyframes shimmer {
+            0%, 100% { opacity: 0; }
+            50% { opacity: 1; }
+        }
+
+        .app-header {
+            text-align: center;
+            margin-bottom: 1.8rem;
+        }
+
+        .app-icon-container {
+            position: relative;
+            margin: 0 auto 1rem;
+            width: 70px;
+            height: 70px;
+        }
+
+        .app-icon {
+            width: 70px;
+            height: 70px;
+            background: var(--accent-gradient);
+            border-radius: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            box-shadow: 
+                0 12px 24px rgba(0, 0, 0, 0.2),
+                inset 0 2px 0 rgba(255, 255, 255, 0.2),
+                inset 0 -2px 0 rgba(0, 0, 0, 0.1);
+            animation: iconPulse 4s ease-in-out infinite;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes iconPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .app-icon::before {
+            content: '';
+            position: absolute;
+            top: 6px;
+            left: 6px;
+            right: 6px;
+            height: 18px;
+            background: linear-gradient(135deg, 
+                rgba(255, 255, 255, 0.3) 0%, 
+                rgba(255, 255, 255, 0.1) 100%);
+            border-radius: 8px;
+        }
+
+        .ping-symbol {
+            font-size: 2.2rem;
+            color: white;
+            font-weight: 600;
+            z-index: 1;
+            position: relative;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .app-title {
+            font-size: 2.2rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.3rem;
+            line-height: 1.1;
+        }
+
+        .app-subtitle {
+            font-size: 1rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            line-height: 1.3;
+            margin-bottom: 0.3rem;
+        }
+
+        .app-description {
+            font-size: 0.85rem;
+            color: var(--text-tertiary);
+            font-weight: 400;
+            line-height: 1.4;
+        }
+
+        .form-container {
+            margin-bottom: 1.5rem;
+        }
+
+        .input-group {
+            position: relative;
+            margin-bottom: 1rem;
+        }
+
+        .url-input {
+            width: 100%;
+            height: 48px;
+            padding: 0 16px 0 44px;
+            border: 1.5px solid var(--glass-border);
+            border-radius: 16px;
+            font-size: 0.95rem;
+            font-weight: 500;
+            font-family: inherit;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            color: var(--text-primary);
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        .url-input::placeholder {
+            color: var(--text-tertiary);
+            font-weight: 400;
+        }
+
+        .url-input:focus {
+            border-color: var(--primary-black);
+            background: var(--glass-hover);
+            transform: translateY(-1px);
+            box-shadow: 
+                0 8px 16px rgba(0, 0, 0, 0.15),
+                0 0 0 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .input-icon {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 16px;
+            height: 16px;
+            color: var(--text-tertiary);
+            transition: all 0.3s ease;
+            pointer-events: none;
+        }
+
+        .url-input:focus + .input-icon {
+            color: var(--primary-black);
+            transform: translateY(-50%) scale(1.1);
+        }
+
+        .submit-button {
+            width: 100%;
+            height: 48px;
+            background: var(--accent-gradient);
+            border: none;
+            border-radius: 16px;
+            color: white;
+            font-size: 0.95rem;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 
+                0 6px 16px rgba(0, 0, 0, 0.2),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        }
+
+        .submit-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, 
+                transparent, 
+                rgba(255, 255, 255, 0.2), 
+                transparent);
+            transition: left 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .submit-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 
+                0 10px 24px rgba(0, 0, 0, 0.25),
+                inset 0 1px 0 rgba(255, 255, 255, 0.3);
+        }
+
+        .submit-button:hover::before {
+            left: 100%;
+        }
+
+        .submit-button:active {
+            transform: translateY(0);
+            transition: all 0.1s ease;
+        }
+
+        .submit-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .button-content {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .loading-animation {
+            display: none;
+        }
+
+        .loading-animation.active {
+            display: flex;
+            gap: 4px;
+        }
+
+        .loading-dot {
+            width: 6px;
+            height: 6px;
+            background: currentColor;
+            border-radius: 50%;
+            animation: loadingPulse 1.2s ease-in-out infinite;
+        }
+
+        .loading-dot:nth-child(1) { animation-delay: -0.3s; }
+        .loading-dot:nth-child(2) { animation-delay: -0.15s; }
+        .loading-dot:nth-child(3) { animation-delay: 0s; }
+
+        @keyframes loadingPulse {
+            0%, 80%, 100% { 
+                transform: scale(0.8); 
+                opacity: 0.5; 
+            }
+            40% { 
+                transform: scale(1.2); 
+                opacity: 1; 
+            }
+        }
+
+        .status-display {
+            margin-top: 1rem;
+            padding: 14px 16px;
+            border-radius: 12px;
+            font-weight: 500;
+            font-size: 0.85rem;
+            display: none;
+            align-items: center;
+            gap: 10px;
+            animation: statusSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            backdrop-filter: blur(20px);
+        }
+
+        @keyframes statusSlideIn {
+            from { 
+                opacity: 0; 
+                transform: translateY(20px) scale(0.95); 
+            }
+            to { 
+                opacity: 1; 
+                transform: translateY(0) scale(1); 
+            }
+        }
+
+        .status-display.success {
+            background: rgba(34, 197, 94, 0.15);
+            color: #059669;
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+
+        .status-display.error {
+            background: rgba(239, 68, 68, 0.15);
+            color: #dc2626;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .status-icon {
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+        }
+
+        .features-showcase {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.8rem;
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--glass-border);
+        }
+
+        .feature-card {
+            text-align: center;
+            padding: 1rem 0.6rem;
+            border-radius: 14px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .feature-card:hover {
+            background: var(--glass-hover);
+            transform: translateY(-3px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+        }
+
+        .feature-icon {
+            width: 24px;
+            height: 24px;
+            margin: 0 auto 0.6rem;
+            color: var(--text-secondary);
+            transition: all 0.3s ease;
+        }
+
+        .feature-card:hover .feature-icon {
+            color: var(--primary-black);
+            transform: scale(1.05);
+        }
+
+        .feature-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.2rem;
+        }
+
+        .feature-subtitle {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            font-weight: 400;
+            line-height: 1.3;
+        }
+
+        /* Mobile Responsive Design */
+        @media (max-width: 640px) {
+            body {
+                padding: 0.8rem;
+            }
+            
+            .liquid-glass-card {
+                padding: 1.5rem 1.2rem;
+                border-radius: 20px;
+            }
+            
+            .app-icon {
+                width: 60px;
+                height: 60px;
+                border-radius: 16px;
+            }
+            
+            .ping-symbol {
+                font-size: 1.8rem;
+            }
+            
+            .app-title {
+                font-size: 1.9rem;
+            }
+            
+            .app-subtitle {
+                font-size: 0.9rem;
+            }
+            
+            .app-description {
+                font-size: 0.8rem;
+            }
+            
+            .url-input {
+                height: 44px;
+                font-size: 0.9rem;
+                padding: 0 14px 0 40px;
+            }
+            
+            .submit-button {
+                height: 44px;
+                font-size: 0.9rem;
+            }
+            
+            .features-showcase {
+                gap: 0.6rem;
+                margin-top: 1.2rem;
+                padding-top: 1.2rem;
+            }
+            
+            .feature-card {
+                padding: 0.8rem 0.5rem;
+            }
+            
+            .feature-icon {
+                width: 20px;
+                height: 20px;
+            }
+            
+            .feature-title {
+                font-size: 0.75rem;
+            }
+            
+            .feature-subtitle {
+                font-size: 0.65rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .liquid-glass-card {
+                padding: 1.2rem 1rem;
+            }
+            
+            .app-header {
+                margin-bottom: 1.5rem;
+            }
+            
+            .app-title {
+                font-size: 1.7rem;
+            }
+            
+            .ping-symbol {
+                font-size: 1.6rem;
+            }
+            
+            .features-showcase {
+                grid-template-columns: 1fr;
+                gap: 0.5rem;
+            }
+            
+            .feature-card {
+                padding: 0.8rem;
+                display: flex;
+                align-items: center;
+                text-align: left;
+                gap: 0.8rem;
+            }
+            
+            .feature-icon {
+                margin: 0;
+                flex-shrink: 0;
+            }
+            
+            .feature-content {
+                flex: 1;
+            }
+        }
+
+        @media (max-height: 700px) {
+            .liquid-glass-card {
+                padding: 1.2rem;
+            }
+            
+            .app-header {
+                margin-bottom: 1.2rem;
+            }
+            
+            .app-icon {
+                width: 55px;
+                height: 55px;
+            }
+            
+            .ping-symbol {
+                font-size: 1.6rem;
+            }
+            
+            .app-title {
+                font-size: 1.8rem;
+            }
+            
+            .features-showcase {
+                margin-top: 1rem;
+                padding-top: 1rem;
+            }
+            
+            .feature-card {
+                padding: 0.7rem 0.4rem;
+            }
+        }
+
+        /* Accessibility improvements */
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Keep Your Site Alive</h1>
-        <p>Add your onrender.com (or any other) URL to keep it from spinning down.</p>
-        <form id="pingerForm">
-            <input type="url" id="urlInput" placeholder="https://your-app.onrender.com" required>
-            <button type="submit">Add URL</button>
-        </form>
-        <div id="message"></div>
+    <div class="app-container">
+        <div class="liquid-glass-card">
+            <div class="app-header">
+                <div class="app-icon-container">
+                    <div class="app-icon">
+                        <div class="ping-symbol">📡</div>
+                    </div>
+                </div>
+                <h1 class="app-title">Pinger</h1>
+                <p class="app-subtitle">Keep your sites alive, always</p>
+                <p class="app-description">Prevent your hosted apps from sleeping with automated health checks</p>
+            </div>
+
+            <form id="pingerForm" class="form-container">
+                <div class="input-group">
+                    <input 
+                        type="url" 
+                        id="urlInput" 
+                        class="url-input"
+                        placeholder="https://your-app.onrender.com" 
+                        required
+                        autocomplete="url"
+                        spellcheck="false"
+                    >
+                    <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                    </svg>
+                </div>
+                
+                <button type="submit" class="submit-button" id="submitBtn">
+                    <div class="button-content">
+                        <div class="loading-animation" id="loadingDots">
+                            <div class="loading-dot"></div>
+                            <div class="loading-dot"></div>
+                            <div class="loading-dot"></div>
+                        </div>
+                        <span id="buttonText">Start Monitoring</span>
+                    </div>
+                </button>
+            </form>
+
+            <div id="statusMessage" class="status-display"></div>
+
+            <div class="features-showcase">
+                <div class="feature-card">
+                    <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <polyline points="12,6 12,12 16,14"/>
+                    </svg>
+                    <div class="feature-content">
+                        <div class="feature-title">24/7 Monitoring</div>
+                        <div class="feature-subtitle">Continuous health checks</div>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+                    </svg>
+                    <div class="feature-content">
+                        <div class="feature-title">Zero Downtime</div>
+                        <div class="feature-subtitle">Keep apps running</div>
+                    </div>
+                </div>
+                <div class="feature-card">
+                    <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    </svg>
+                    <div class="feature-content">
+                        <div class="feature-title">Made Enterprise</div>
+                        <div class="feature-subtitle">Scale with confidence</div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
+        // Form elements
         const form = document.getElementById('pingerForm');
         const urlInput = document.getElementById('urlInput');
-        const messageDiv = document.getElementById('message');
+        const statusMessage = document.getElementById('statusMessage');
+        const submitBtn = document.getElementById('submitBtn');
+        const loadingDots = document.getElementById('loadingDots');
+        const buttonText = document.getElementById('buttonText');
 
+        // Enhanced URL validation and auto-formatting
+        urlInput.addEventListener('input', function(e) {
+            let url = this.value.trim();
+            if (url && !url.startsWith('http://') && !url.startsWith('https://')) {
+                this.value = 'https://' + url;
+            }
+        });
+
+        // Enhanced focus interactions
+        urlInput.addEventListener('focus', function() {
+            this.style.transform = 'translateY(-1px)';
+        });
+
+        urlInput.addEventListener('blur', function() {
+            this.style.transform = 'translateY(0)';
+        });
+
+        // Form submission with enhanced error handling
         form.addEventListener('submit', async (e) => {
-            e.preventDefault(); // Prevent default form submission
+            e.preventDefault();
             
-            const url = urlInput.value;
-            messageDiv.textContent = 'Adding URL...';
-            messageDiv.className = '';
+            const url = urlInput.value.trim();
+            
+            // Comprehensive URL validation
+            if (!isValidUrl(url)) {
+                showStatusMessage('Please enter a valid URL', 'error');
+                return;
+            }
+            
+            // Set loading state
+            setLoadingState(true);
+            hideStatusMessage();
 
             try {
                 const response = await fetch('/api/add-url', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
                     },
                     body: JSON.stringify({ url: url })
                 });
@@ -51,17 +745,89 @@
                 const result = await response.json();
 
                 if (response.ok) {
-                    messageDiv.textContent = result.message;
-                    messageDiv.className = 'success';
-                    urlInput.value = ''; // Clear input field
+                    showStatusMessage(result.message || '✅ URL added successfully! Your site will stay alive.', 'success');
+                    urlInput.value = '';
+                    
+                    // Success animation
+                    buttonText.textContent = '✓ Added Successfully';
+                    setTimeout(() => {
+                        buttonText.textContent = 'Start Monitoring';
+                    }, 3000);
                 } else {
-                    messageDiv.textContent = `Error: ${result.error}`;
-                    messageDiv.className = 'error';
+                    showStatusMessage(result.error || 'Failed to add URL. Please try again.', 'error');
                 }
             } catch (error) {
-                messageDiv.textContent = 'A network error occurred. Please try again.';
-                messageDiv.className = 'error';
+                console.error('Network error:', error);
+                showStatusMessage('Network error occurred. Please check your connection and try again.', 'error');
+            } finally {
+                setLoadingState(false);
             }
+        });
+
+        // Loading state management
+        function setLoadingState(loading) {
+            submitBtn.disabled = loading;
+            
+            if (loading) {
+                loadingDots.classList.add('active');
+                buttonText.textContent = 'Adding URL...';
+                submitBtn.style.pointerEvents = 'none';
+            } else {
+                loadingDots.classList.remove('active');
+                submitBtn.style.pointerEvents = 'auto';
+                if (buttonText.textContent === 'Adding URL...') {
+                    buttonText.textContent = 'Start Monitoring';
+                }
+            }
+        }
+
+        // Enhanced status message display
+        function showStatusMessage(text, type) {
+            const iconSvg = type === 'success' 
+                ? '<svg class="status-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22,4 12,14.01 9,11.01"/></svg>'
+                : '<svg class="status-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>';
+            
+            statusMessage.innerHTML = `${iconSvg}<span>${text}</span>`;
+            statusMessage.className = `status-display ${type}`;
+            statusMessage.style.display = 'flex';
+            
+            // Auto-hide success messages
+            if (type === 'success') {
+                setTimeout(() => {
+                    hideStatusMessage();
+                }, 5000);
+            }
+        }
+
+        function hideStatusMessage() {
+            statusMessage.style.display = 'none';
+        }
+
+        function isValidUrl(string) {
+            try {
+                new URL(string);
+                return true;
+            } catch (_) {
+                return false;
+            }
+        }
+
+        // Add keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                form.dispatchEvent(new Event('submit'));
+            }
+        });
+
+        // Add visual feedback for feature items
+        document.querySelectorAll('.feature-card').forEach(item => {
+            item.addEventListener('mouseenter', function() {
+                this.style.transform = 'translateY(-3px)';
+            });
+            
+            item.addEventListener('mouseleave', function() {
+                this.style.transform = 'translateY(0)';
+            });
         });
     </script>
 </body>
