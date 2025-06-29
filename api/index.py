@@ -47,7 +47,8 @@ app = Flask(__name__, static_folder='../public', static_url_path='')
 # Route to serve your index.html from the 'public' folder
 @app.route('/')
 def serve_index():
-    return send_from_directory(app.static_folder, 'index.html')
+    static_folder = app.static_folder or '../public'
+    return send_from_directory(static_folder, 'index.html')
 
 # API Endpoint for users to add a new URL
 @app.route('/api/add-url', methods=['POST'])
