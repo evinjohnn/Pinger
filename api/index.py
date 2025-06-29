@@ -1,14 +1,19 @@
+# api/index.py (Correct and Final Version)
 import os
 import time
 import requests
 from flask import Flask, request, jsonify, send_from_directory
 
-# --- START: New Mocking Logic ---
+# --- START: Mocking & Real KV Logic ---
 # This code checks if the Vercel-specific environment variables for the KV store exist.
 # If they DON'T exist, we know we're running locally and create a fake "mock" database.
 # If they DO exist, we know we're on Vercel and use the real database.
 
-if 'KV_URL' not in os.environ:
+vercel_kv_url = os.environ.get('VERCEL_KV_URL')
+vercel_kv_rest_api_url = os.environ.get('VERCEL_KV_REST_API_URL')
+vercel_kv_rest_api_token = os.environ.get('VERCEL_KV_REST_API_TOKEN')
+
+if not all([vercel_kv_url, vercel_kv_rest_api_url, vercel_kv_rest_api_token]):
     print("--- [LOCAL DEV MODE] ---")
     print("--- Vercel KV env vars not found. Using in-memory MockKV. ---")
     print("--- Data will be lost on server restart. ---")
@@ -22,10 +27,12 @@ if 'KV_URL' not in os.environ:
         def sadd(self, key, value):
             # Mimics the Redis 'sadd' command
             self._data.add(value)
-            return 1 # 'sadd' returns 1 if a new element was added
+            print(f"[MockDB] Added '{value}'. Current data: {self._data}")
+            return 1
 
         def smembers(self, key):
             # Mimics the Redis 'smembers' command
+            print(f"[MockDB] Retrieving data. Current data: {self._data}")
             return self._data
             
     # Create an instance of our fake database
@@ -37,10 +44,9 @@ else:
     from vercel_kv import KV
     kv = KV()
 
-# --- END: New Mocking Logic ---
+# --- END: Mocking & Real KV Logic ---
 
 
-# The rest of your application code remains almost identical!
 # Point Flask to the 'public' folder for static files
 app = Flask(__name__, static_folder='../public', static_url_path='')
 
@@ -62,8 +68,7 @@ def add_url():
         return jsonify({"error": "Invalid URL format"}), 400
     
     try:
-        kv.sadd("urls_to_ping", url_to_add) # This now works with both the real and mock KV
-        print(f"Added URL to the set: {url_to_add}")
+        kv.sadd("urls_to_ping", url_to_add)  # type: ignore
         return jsonify({"message": f"URL '{url_to_add}' added successfully."}), 200
     except Exception as e:
         print(f"Error adding URL: {e}")
@@ -73,17 +78,15 @@ def add_url():
 # API Endpoint that the Cron Job will trigger
 @app.route('/api/ping-all', methods=['GET'])
 def ping_all():
-    # We will simulate the auth for local testing by simply not checking if the secret is missing
     auth_header = request.headers.get('Authorization')
     cron_secret = os.environ.get('CRON_SECRET')
 
-    # On Vercel, cron_secret will exist. Locally, it won't. This logic handles both.
     if cron_secret and (not auth_header or auth_header != f"Bearer {cron_secret}"):
         print("Unauthorized attempt to access /api/ping-all")
         return "Unauthorized", 401
 
     try:
-        urls = kv.smembers("urls_to_ping") # This also works with both real and mock
+        urls = kv.smembers("urls_to_ping")   # type: ignore
         if not urls:
             print("No URLs to ping.")
             return jsonify({"message": "No URLs to ping."}), 200
