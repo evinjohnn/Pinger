@@ -1,18 +1,53 @@
 import os
 import time
 import requests
-from flask import Flask, request, jsonify
-from vercel_kv import KV
+from flask import Flask, request, jsonify, send_from_directory
 
-app = Flask(__name__)
+# --- START: New Mocking Logic ---
+# This code checks if the Vercel-specific environment variables for the KV store exist.
+# If they DON'T exist, we know we're running locally and create a fake "mock" database.
+# If they DO exist, we know we're on Vercel and use the real database.
 
-# Initialize KV store
-kv = KV()
+if 'KV_URL' not in os.environ:
+    print("--- [LOCAL DEV MODE] ---")
+    print("--- Vercel KV env vars not found. Using in-memory MockKV. ---")
+    print("--- Data will be lost on server restart. ---")
+    
+    # This is our fake, in-memory database class
+    class MockKV:
+        def __init__(self):
+            # We'll just use a simple Python set to store URLs
+            self._data = set()
 
-# A simple health check route
+        def sadd(self, key, value):
+            # Mimics the Redis 'sadd' command
+            self._data.add(value)
+            return 1 # 'sadd' returns 1 if a new element was added
+
+        def smembers(self, key):
+            # Mimics the Redis 'smembers' command
+            return self._data
+            
+    # Create an instance of our fake database
+    kv = MockKV()
+
+else:
+    # This block runs ONLY when deployed on Vercel
+    print("--- [PRODUCTION MODE] Vercel KV env vars found. ---")
+    from vercel_kv import KV
+    kv = KV()
+
+# --- END: New Mocking Logic ---
+
+
+# The rest of your application code remains almost identical!
+# Point Flask to the 'public' folder for static files
+app = Flask(__name__, static_folder='../public', static_url_path='')
+
+# Route to serve your index.html from the 'public' folder
 @app.route('/')
-def home():
-    return "Pinger service is alive!"
+def serve_index():
+    return send_from_directory(app.static_folder, 'index.html')
 
 # API Endpoint for users to add a new URL
 @app.route('/api/add-url', methods=['POST'])
@@ -22,34 +57,32 @@ def add_url():
         return jsonify({"error": "URL not provided"}), 400
 
     url_to_add = data['url']
-
-    # Basic validation (you can add more complex checks)
     if not url_to_add.startswith(('http://', 'https://')):
         return jsonify({"error": "Invalid URL format"}), 400
     
     try:
-        # We use a Redis 'SET' to automatically handle duplicates.
-        # 'sadd' adds the item to the set. If it's already there, it does nothing.
-        kv.sadd("urls_to_ping", url_to_add)
+        kv.sadd("urls_to_ping", url_to_add) # This now works with both the real and mock KV
         print(f"Added URL to the set: {url_to_add}")
         return jsonify({"message": f"URL '{url_to_add}' added successfully."}), 200
     except Exception as e:
-        print(f"Error adding URL to KV store: {e}")
+        print(f"Error adding URL: {e}")
         return jsonify({"error": "Could not save URL."}), 500
 
 
 # API Endpoint that the Cron Job will trigger
 @app.route('/api/ping-all', methods=['GET'])
 def ping_all():
-    # A simple security check to prevent unauthorized triggers, 
-    # Vercel will send this header for its cron jobs.
+    # We will simulate the auth for local testing by simply not checking if the secret is missing
     auth_header = request.headers.get('Authorization')
-    if not auth_header or auth_header != f"Bearer {os.environ.get('CRON_SECRET')}":
+    cron_secret = os.environ.get('CRON_SECRET')
+
+    # On Vercel, cron_secret will exist. Locally, it won't. This logic handles both.
+    if cron_secret and (not auth_header or auth_header != f"Bearer {cron_secret}"):
+        print("Unauthorized attempt to access /api/ping-all")
         return "Unauthorized", 401
 
     try:
-        # 'smembers' gets all items from the set
-        urls = kv.smembers("urls_to_ping")
+        urls = kv.smembers("urls_to_ping") # This also works with both real and mock
         if not urls:
             print("No URLs to ping.")
             return jsonify({"message": "No URLs to ping."}), 200
@@ -59,7 +92,6 @@ def ping_all():
         ping_results = {}
         for url in urls:
             try:
-                # We add a timeout to prevent the function from hanging
                 response = requests.get(url, timeout=10)
                 status = response.status_code
                 print(f"Pinged {url}: Status {status}")
@@ -75,6 +107,7 @@ def ping_all():
         print(f"An error occurred during the ping cycle: {e}")
         return jsonify({"error": "An internal error occurred."}), 500
 
-# This is for local development if you want to test it
+
+# This block is only for local development
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True, port=5001)
