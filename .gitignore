@@ -6,3 +6,5 @@ __pycache__/
 # Environment
 .env.env
 .env
+node_modules
+node_modules/
