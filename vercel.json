@@ -19,11 +19,6 @@
       "src": "/(.*)",
       "dest": "public/$1"
     }
-  ],
-  "crons": [
-    {
-      "path": "/api/ping-all",
-      "schedule": "*/4 * * * *"
-    }
   ]
+  // The "crons" section has been completely removed.
 }
