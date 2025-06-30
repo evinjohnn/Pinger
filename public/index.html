@@ -229,6 +229,42 @@
         .feature-card:hover .feature-icon { color: var(--primary-black); transform: scale(1.05); }
         .feature-title { font-size: 0.8rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.2rem; }
         .feature-subtitle { font-size: 0.7rem; color: var(--text-secondary); font-weight: 400; line-height: 1.3; }
+        /* Copy Key Button Style */
+        .copy-key-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 8px;
+            padding: 4px 10px 4px 8px;
+            margin-left: 10px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--primary-black);
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 2px 6px var(--glass-shadow);
+            outline: none;
+            gap: 4px;
+        }
+        .copy-key-btn:hover {
+            background: var(--glass-hover);
+            color: var(--primary-black);
+            transform: translateY(-1px) scale(1.04);
+            box-shadow: 0 4px 12px var(--glass-shadow);
+        }
+        .copy-key-btn:active {
+            background: var(--primary-medium);
+            color: var(--primary-black);
+            transform: scale(0.98);
+        }
+        .copy-key-btn svg {
+            width: 15px;
+            height: 15px;
+            margin-right: 2px;
+            stroke: var(--primary-black);
+        }
         @media (max-width: 640px) { body { padding: 0.8rem; } .navbar { padding: 0.8rem; } .about-button { padding: 6px 12px; font-size: 0.8rem; } .about-button svg { width: 12px; height: 12px; } .liquid-glass-card { padding: 1.5rem 1.2rem; border-radius: 20px; } .app-icon { width: 60px; height: 60px; border-radius: 16px; } .ping-symbol { font-size: 1.8rem; } .app-title { font-size: 1.9rem; } .app-subtitle { font-size: 0.9rem; } .app-description { font-size: 0.8rem; } .url-input { height: 44px; font-size: 0.9rem; padding: 0 14px 0 40px; } .submit-button { height: 44px; font-size: 0.9rem; } .features-showcase { gap: 0.6rem; margin-top: 1.2rem; padding-top: 1.2rem; } .feature-card { padding: 0.8rem 0.5rem; } .feature-icon { width: 20px; height: 20px; } .feature-title { font-size: 0.75rem; } .feature-subtitle { font-size: 0.65rem; } }
         @media (max-width: 480px) { .navbar { padding: 0.6rem; } .about-button { padding: 5px 10px; font-size: 0.75rem; } .about-button svg { width: 11px; height: 11px; } .liquid-glass-card { padding: 1.2rem 1rem; } .app-header { margin-bottom: 1.5rem; } .app-title { font-size: 1.7rem; } .ping-symbol { font-size: 1.6rem; } .features-showcase { grid-template-columns: 1fr; gap: 0.5rem; } .feature-card { padding: 0.8rem; display: flex; align-items: center; text-align: left; gap: 0.8rem; } .feature-icon { margin: 0; flex-shrink: 0; } .feature-content { flex: 1; } }
         @media (max-height: 700px) { .liquid-glass-card { padding: 1.2rem; } .app-header { margin-bottom: 1.2rem; } .app-icon { width: 55px; height: 55px; } .ping-symbol { font-size: 1.6rem; } .app-title { font-size: 1.8rem; } .features-showcase { margin-top: 1rem; padding-top: 1rem; } .feature-card { padding: 0.7rem 0.4rem; } }
@@ -398,7 +434,7 @@
                 // CRITICAL: Handle the response for 'add'
                 if (response.ok && action === 'add') {
                     const removalKey = result.removal_key;
-                    const successMessage = `URL added! IMPORTANT: Save your removal key: <strong>${removalKey}</strong> <button onclick=\"navigator.clipboard.writeText('${removalKey}')\">Copy</button>`;
+                    const successMessage = `URL added! IMPORTANT: Save your removal key: <strong>${removalKey}</strong> <button class=\"copy-key-btn\" data-key=\"${removalKey}\" title=\"Copy removal key\"><svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><rect x=\"9\" y=\"9\" width=\"13\" height=\"13\" rx=\"2\"/><rect x=\"3\" y=\"3\" width=\"13\" height=\"13\" rx=\"2\"/></svg>Copy</button>`;
                     showStatusMessage(successMessage, 'success');
                     // Do not auto-hide this message, it's too important
                     // The user can dismiss it by trying another action
@@ -479,6 +515,21 @@
                 return false;
             }
         }
+
+        // Delegated event handler for copy key button
+        statusMessage.addEventListener('click', function(e) {
+            const btn = e.target.closest('.copy-key-btn');
+            if (btn) {
+                const key = btn.getAttribute('data-key');
+                if (key) {
+                    navigator.clipboard.writeText(key);
+                    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>Copied!';
+                    setTimeout(() => {
+                        btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><rect x="3" y="3" width="13" height="13" rx="2"/></svg>Copy';
+                    }, 1800);
+                }
+            }
+        });
     </script>
 </body>
 </html>
