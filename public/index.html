@@ -273,6 +273,21 @@
                     </svg>
                 </div>
                 
+                <!-- NEW: Add a field for the removal key, maybe hidden by default -->
+                <div class="input-group" id="removalKeyGroup" style="display: none; margin-top: 0.8rem;">
+                    <input 
+                        type="text" 
+                        id="removalKeyInput" 
+                        class="url-input"
+                        placeholder="Enter your removal key" 
+                    >
+                    <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M16 12v-1a4 4 0 1 0-8 0v1"/>
+                        <rect x="8" y="12" width="8" height="4" rx="1"/>
+                    </svg>
+                </div>
+                
                 <div class="button-group">
                     <button type="submit" class="submit-button" id="submitBtn">
                         <div class="button-content">
@@ -315,6 +330,10 @@
         const loadingDotsRemove = document.getElementById('loadingDotsRemove');
         const buttonTextRemove = document.getElementById('buttonTextRemove');
         
+        // NEW: Removal key elements
+        const removalKeyGroup = document.getElementById('removalKeyGroup');
+        const removalKeyInput = document.getElementById('removalKeyInput');
+        
         // Auto-format URL input
         urlInput.addEventListener('input', function(e) {
             let url = this.value.trim();
@@ -329,8 +348,17 @@
             handleAction('add');
         });
         
+        // UPDATED: Remove button click handler
         removeBtn.addEventListener('click', () => {
-            handleAction('remove');
+            // If the key field is already visible, we proceed with the action
+            if (removalKeyGroup.style.display === 'block') {
+                handleAction('remove');
+            } else {
+                // Otherwise, just show the field first
+                removalKeyGroup.style.display = 'block';
+                statusMessage.style.display = 'none'; // hide any old messages
+                buttonTextRemove.textContent = "Confirm Removal"; // Update button text
+            }
         });
 
         async function handleAction(action) {
@@ -340,11 +368,21 @@
                 return;
             }
 
+            let body = { url: url };
+            const endpoint = action === 'add' ? '/api/add-url' : '/api/remove-url';
+
+            if (action === 'remove') {
+                const removalKey = removalKeyInput.value.trim();
+                if (!removalKey) {
+                    showStatusMessage('Please enter the removal key.', 'error');
+                    return;
+                }
+                body.removal_key = removalKey;
+            }
+
             setLoadingState(true, action);
             hideStatusMessage();
 
-            const endpoint = action === 'add' ? '/api/add-url' : '/api/remove-url';
-            
             try {
                 const response = await fetch(endpoint, {
                     method: 'POST',
@@ -352,16 +390,27 @@
                         'Content-Type': 'application/json',
                         'Accept': 'application/json'
                     },
-                    body: JSON.stringify({ url: url })
+                    body: JSON.stringify(body)
                 });
 
                 const result = await response.json();
 
-                if (response.ok) {
-                    showStatusMessage(result.message || 'Action completed successfully.', 'success');
+                // CRITICAL: Handle the response for 'add'
+                if (response.ok && action === 'add') {
+                    const removalKey = result.removal_key;
+                    const successMessage = `URL added! IMPORTANT: Save your removal key: <strong>${removalKey}</strong> <button onclick=\"navigator.clipboard.writeText('${removalKey}')\">Copy</button>`;
+                    showStatusMessage(successMessage, 'success');
+                    // Do not auto-hide this message, it's too important
+                    // The user can dismiss it by trying another action
+                } else if (response.ok) {
+                    // Standard success for remove
+                    showStatusMessage(result.message, 'success');
                     urlInput.value = '';
-                    setSuccessState(action);
+                    removalKeyInput.value = '';
+                    removalKeyGroup.style.display = 'none';
+                    buttonTextRemove.textContent = 'Remove URL'; // Reset button text
                 } else {
+                    // Error handling
                     showStatusMessage(result.error || `Failed to ${action} URL. Please try again.`, 'error');
                 }
             } catch (error) {
