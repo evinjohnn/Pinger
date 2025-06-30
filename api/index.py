@@ -1,8 +1,10 @@
 import os
 import time
 import requests
-from flask import Flask, request, jsonify, send_from_directory
 import redis
+import asyncio
+import aiohttp
+from flask import Flask, request, jsonify, send_from_directory
 
 redis_url = os.environ.get('REDIS_URL')
 
@@ -126,8 +128,22 @@ def remove_url():
         print(f"Error removing URL: {e}")
         return jsonify({"error": "Could not remove URL."}), 500
 
+# --- Helper function for async pinging ---
+async def ping_one_url(session, url):
+    """Asynchronously pings a single URL and returns the result."""
+    try:
+        # Use aiohttp session to make the GET request
+        async with session.get(url, timeout=10) as response:
+            status = response.status
+            print(f"Pinged {url}: Status {status}")
+            return (url, {"status": status, "timestamp": time.time()})
+    except Exception as e:
+        # Catch any exception (timeout, connection error, etc.)
+        print(f"Failed to ping {url}: {e}")
+        return (url, {"status": "Error", "error_message": str(e)})
+
 @app.route('/api/ping-all', methods=['GET'])
-def ping_all():
+async def ping_all():
     auth_header = request.headers.get('Authorization')
     cron_secret = os.environ.get('CRON_SECRET')
 
@@ -143,18 +159,17 @@ def ping_all():
             print("No URLs to ping.")
             return jsonify({"message": "No URLs to ping."}), 200
 
-        print(f"--- Pinging {len(urls)} URLs at {time.strftime('%Y-%m-%d %H:%M:%S')} ---")
+        print(f"--- Concurrently pinging {len(urls)} URLs at {time.strftime('%Y-%m-%d %H:%M:%S')} ---")
         
-        ping_results = {}
-        for url in urls:
-            try:
-                response = requests.get(url, timeout=10)
-                status = response.status_code
-                print(f"Pinged {url}: Status {status}")
-                ping_results[url] = {"status": status, "timestamp": time.time()}
-            except requests.RequestException as e:
-                print(f"Failed to ping {url}: {e}")
-                ping_results[url] = {"status": "Error", "error_message": str(e)}
+        # Use a single aiohttp session for all requests
+        async with aiohttp.ClientSession() as session:
+            # Create a list of tasks (coroutines) to be run
+            tasks = [ping_one_url(session, url) for url in urls]
+            # Run all tasks concurrently and wait for them to complete
+            results = await asyncio.gather(*tasks)
+        
+        # Convert the list of tuples back into a dictionary
+        ping_results = {url: result for url, result in results}
 
         print("--- Ping cycle complete ---")
         return jsonify({"status": "success", "results": ping_results}), 200
