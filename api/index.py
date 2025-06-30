@@ -2,9 +2,9 @@ import os
 import time
 import requests
 import redis
-import asyncio
+import asyncio 
 import aiohttp
-import secrets  # Use Python's built-in for secure random tokens
+import secrets
 from flask import Flask, request, jsonify, send_from_directory
 from collections.abc import Awaitable
 
@@ -44,7 +44,7 @@ if not redis_url:
         def incr(self, key):
             self._rate_limit[key] = self._rate_limit.get(key, 0) + 1
             return self._rate_limit[key]
-        def expire(self, key, seconds):
+        def expire(self, key, seconds, **kwargs):
             # Mock expire is not really needed for this logic
             pass
         # --- Hash methods for mock Redis hash ---
@@ -74,6 +74,25 @@ if not redis_url:
             exists = key in self._hashes.get(name, {})
             print(f"[MockDB] hexists: {name}[{key}] -> {exists}")
             return exists
+        def pipeline(self):
+            # A minimal mock pipeline
+            class MockPipeline:
+                def __init__(self, parent):
+                    self._parent = parent
+                    self._commands = []
+                def incr(self, key):
+                    self._commands.append(('incr', key))
+                def expire(self, key, seconds, nx=False):
+                    self._commands.append(('expire', key, seconds))
+                def execute(self):
+                    results = []
+                    for cmd in self._commands:
+                        if cmd[0] == 'incr':
+                            results.append(self._parent.incr(cmd[1]))
+                        elif cmd[0] == 'expire':
+                            results.append(self._parent.expire(cmd[1], cmd[2]))
+                    return results
+            return MockPipeline(self)
             
     kv = MockKV()
 
@@ -91,10 +110,9 @@ def is_rate_limited(ip_address):
     key = f"rate_limit:{ip_address}"
     
     try:
-        # Use a pipeline for atomic operations
         pipe = kv.pipeline()
         pipe.incr(key)
-        pipe.expire(key, RATE_LIMIT_WINDOW, nx=True) # Set expiry only if key is new
+        pipe.expire(key, RATE_LIMIT_WINDOW, nx=True)
         current_count, _ = pipe.execute()
 
         if int(current_count) > RATE_LIMIT_COUNT:
@@ -112,7 +130,7 @@ def serve_index():
 
 def generate_removal_key():
     """Generates a secure, URL-safe random token."""
-    return secrets.token_hex(8) # e.g., 'a1b2c3d4e5f6a7b8'
+    return secrets.token_hex(8)
 
 @app.route('/api/add-url', methods=['POST'])
 def add_url():
@@ -129,20 +147,17 @@ def add_url():
         return jsonify({"error": "Invalid URL format. Must start with http:// or https://"}), 400
     
     try:
-        # Check if the URL (field) already exists in our hash
         if kv.hexists("monitored_urls", url_to_add):
             return jsonify({"message": "URL is already being monitored."}), 200
 
-        # Generate a new key and store it
         removal_key = generate_removal_key()
         kv.hset("monitored_urls", url_to_add, removal_key)
 
         print(f"Added URL: {url_to_add} with key: {removal_key}")
         
-        # Return the key to the user!
         return jsonify({
             "message": f"URL '{url_to_add}' added successfully!",
-            "removal_key": removal_key # THIS IS THE CRITICAL ADDITION
+            "removal_key": removal_key
         }), 200
         
     except Exception as e:
@@ -156,49 +171,37 @@ def remove_url():
         return jsonify({"error": "You are sending too many requests. Please wait a moment."}), 429
 
     data = request.get_json()
-    if not data or 'url' not in data or 'removal_key' not in data: # NOW REQUIRES KEY
+    if not data or 'url' not in data or 'removal_key' not in data:
         return jsonify({"error": "URL and removal_key must be provided"}), 400
 
     url_to_remove = data['url'].strip()
     key_provided = data['removal_key'].strip()
 
     try:
-        # Get the stored key for the URL
-        stored_key = kv.hget("monitored_urls", url_to_remove)
-        if stored_key:
-            if isinstance(stored_key, bytes):
-                stored_key_decoded = stored_key.decode('utf-8')
+        stored_key_bytes = kv.hget("monitored_urls", url_to_remove)
+        
+        if stored_key_bytes:
+            stored_key_decoded = stored_key_bytes.decode('utf-8')
+            if stored_key_decoded == key_provided:
+                kv.hdel("monitored_urls", url_to_remove)
+                return jsonify({"message": f"URL '{url_to_remove}' has been removed."}), 200
             else:
-                stored_key_decoded = stored_key
+                return jsonify({"error": "Invalid removal key for the given URL."}), 403
         else:
-            stored_key_decoded = None
-
-        if stored_key_decoded == key_provided:
-            # Key matches, so we can delete it
-            kv.hdel("monitored_urls", url_to_remove)
-            return jsonify({"message": f"URL '{url_to_remove}' has been removed."}), 200
-        elif stored_key_decoded:
-            # URL exists, but key is wrong
-            return jsonify({"error": "Invalid removal key for the given URL."}), 403 # 403 Forbidden
-        else:
-            # URL not found
             return jsonify({"error": "URL not found in the monitoring list."}), 404
             
     except Exception as e:
         print(f"Error removing URL: {e}")
         return jsonify({"error": "Could not remove URL."}), 500
 
-# --- Helper function for async pinging ---
 async def ping_one_url(session, url):
     """Asynchronously pings a single URL and returns the result."""
     try:
-        # Use aiohttp session to make the GET request
         async with session.get(url, timeout=10) as response:
             status = response.status
             print(f"Pinged {url}: Status {status}")
             return (url, {"status": status, "timestamp": time.time()})
     except Exception as e:
-        # Catch any exception (timeout, connection error, etc.)
         print(f"Failed to ping {url}: {e}")
         return (url, {"status": "Error", "error_message": str(e)})
 
@@ -212,33 +215,19 @@ async def ping_all():
         return "Unauthorized", 401
 
     try:
-        # Get all the URLs from the hash keys
         urls_bytes = kv.hkeys("monitored_urls")
-        # Handle if hkeys returns an Awaitable (for some Redis async clients)
-        if isinstance(urls_bytes, Awaitable):
-            import asyncio
-            urls_bytes = asyncio.get_event_loop().run_until_complete(urls_bytes)
-        urls = set()
-        for url in urls_bytes:
-            if isinstance(url, bytes):
-                urls.add(url.decode('utf-8'))
-            else:
-                urls.add(url)
-        
+        urls = {url.decode('utf-8') for url in urls_bytes}
+
         if not urls:
             print("No URLs to ping.")
             return jsonify({"message": "No URLs to ping."}), 200
 
         print(f"--- Concurrently pinging {len(urls)} URLs at {time.strftime('%Y-%m-%d %H:%M:%S')} ---")
         
-        # Use a single aiohttp session for all requests
         async with aiohttp.ClientSession() as session:
-            # Create a list of tasks (coroutines) to be run
             tasks = [ping_one_url(session, url) for url in urls]
-            # Run all tasks concurrently and wait for them to complete
             results = await asyncio.gather(*tasks)
         
-        # Convert the list of tuples back into a dictionary
         ping_results = {url: result for url, result in results}
 
         print("--- Ping cycle complete ---")
