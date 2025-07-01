@@ -4,7 +4,7 @@ name: Website Pinger
 on:
   schedule:
     
-    - cron: '*/11 * * * *'
+    - cron: '*/7 * * * *'
   
 
   workflow_dispatch:
